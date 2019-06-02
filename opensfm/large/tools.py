@@ -4,6 +4,7 @@ import logging
 import networkx as nx
 import numpy as np
 import scipy.spatial as spatial
+import psutil
 
 from collections import namedtuple
 from networkx.algorithms import bipartite
@@ -173,7 +174,7 @@ def add_camera_constraints_hard(ra, reconstruction_shots,
                                                 rec_name2, rec_name2 +
                                                 str(image),
                                                 1, 0.1)
-                
+
 @lru_cache(use_memory_up_to=psutil.virtual_memory().available * 0.9)
 def load_reconstruction(path, index):
     d1 = dataset.DataSet(path)
