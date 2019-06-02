@@ -15,5 +15,6 @@ class Command:
         transformations = \
             tools.align_reconstructions(reconstruction_shots,
                                         tools.partial_reconstruction_name,
-                                        True)
+                                        True,
+                                        meta_data.config['processes'])
         tools.apply_transformations(transformations)

@@ -7,7 +7,7 @@ import scipy.spatial as spatial
 
 from collections import namedtuple
 from networkx.algorithms import bipartite
-from repoze.lru import lru_cache
+from opensfm.large.lru_cache import lru_cache
 
 from opensfm import align
 from opensfm import context
@@ -173,7 +173,8 @@ def add_camera_constraints_hard(ra, reconstruction_shots,
                                                 rec_name2, rec_name2 +
                                                 str(image),
                                                 1, 0.1)
-@lru_cache(25)
+                
+@lru_cache(use_memory_up_to=psutil.virtual_memory().available * 0.9)
 def load_reconstruction(path, index):
     d1 = dataset.DataSet(path)
     r1 = d1.load_reconstruction()[index]
@@ -181,40 +182,44 @@ def load_reconstruction(path, index):
     return (path + ("_%s" % index)), (r1, g1)
 
 
-def add_point_constraints(ra, reconstruction_shots, reconstruction_name):
+def add_point_constraints(ra, reconstruction_shots, reconstruction_name, processes):
     connections = connected_reconstructions(reconstruction_shots)
-    for connection in connections:
+    arguments = [(ra, connection, reconstruction_name) for connection in connections]
+    context.parallel_map(add_connection_point_constraint, arguments, processes)
 
-        i1, (r1, g1) = load_reconstruction(
+
+def add_connection_point_constraint(args):
+    ra, connection, reconstruction_name = args
+    
+    i1, (r1, g1) = load_reconstruction(
             connection[0].submodel_path, connection[0].index)
-        i2, (r2, g2) = load_reconstruction(
-            connection[1].submodel_path, connection[1].index)
+    i2, (r2, g2) = load_reconstruction(
+        connection[1].submodel_path, connection[1].index)
 
-        rec_name1 = reconstruction_name(connection[0])
-        rec_name2 = reconstruction_name(connection[1])
+    rec_name1 = reconstruction_name(connection[0])
+    rec_name2 = reconstruction_name(connection[1])
 
-        scale_treshold = 1.3
-        treshold_in_meter = 0.3
-        minimum_inliers = 20
-        status, T, inliers = reconstruction.resect_reconstruction(
-            r1, r2, g1, g2, treshold_in_meter, minimum_inliers)
-        if not status:
-            continue
+    scale_treshold = 1.3
+    treshold_in_meter = 0.3
+    minimum_inliers = 20
+    status, T, inliers = reconstruction.resect_reconstruction(
+        r1, r2, g1, g2, treshold_in_meter, minimum_inliers)
+    if not status:
+        return
 
-        s, R, t = multiview.decompose_similarity_transform(T)
-        if s > scale_treshold or s < (1.0/scale_treshold) or \
-                len(inliers) < minimum_inliers:
-            continue
+    s, R, t = multiview.decompose_similarity_transform(T)
+    if s > scale_treshold or s < (1.0/scale_treshold) or \
+            len(inliers) < minimum_inliers:
+        return
 
-        for t1, t2 in inliers:
-            c1 = r1.points[t1].coordinates
-            c2 = r2.points[t2].coordinates
+    for t1, t2 in inliers:
+        c1 = r1.points[t1].coordinates
+        c2 = r2.points[t2].coordinates
 
-            ra.add_common_point_constraint(
-                rec_name1, c1[0], c1[1], c1[2],
-                rec_name2, c2[0], c2[1], c2[2],
-                1e-1)
-
+        ra.add_common_point_constraint(
+            rec_name1, c1[0], c1[1], c1[2],
+            rec_name2, c2[0], c2[1], c2[2],
+            1e-1)
 
 def load_reconstruction_shots(meta_data):
     reconstruction_shots = {}
@@ -234,7 +239,8 @@ def load_reconstruction_shots(meta_data):
 def align_reconstructions(reconstruction_shots,
                           reconstruction_name,
                           use_points_constraints,
-                          camera_constraint_type='soft_camera_constraint'):
+                          camera_constraint_type='soft_camera_constraint',
+                          processes=1):
     ra = csfm.ReconstructionAlignment()
 
     if camera_constraint_type is 'soft_camera_constraint':
@@ -244,7 +250,7 @@ def align_reconstructions(reconstruction_shots,
         add_camera_constraints_hard(ra, reconstruction_shots,
                                     reconstruction_name, True)
     if use_points_constraints:
-        add_point_constraints(ra, reconstruction_shots, reconstruction_name)
+        add_point_constraints(ra, reconstruction_shots, reconstruction_name, processes)
 
     logger.info("Running alignment")
     ra.run()
