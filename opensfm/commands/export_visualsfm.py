@@ -45,7 +45,7 @@ class Command:
             q = tf.quaternion_from_matrix(shot.pose.get_rotation_matrix())
             o = shot.pose.get_origin()
 
-            shot_size_cache[shot.id] = data.image_size(shot.id)
+            shot_size_cache[shot.id] = data.undistorted_image_size(shot.id)
             shot_index[shot.id] = i
             i += 1
 

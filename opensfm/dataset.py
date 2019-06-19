@@ -79,16 +79,15 @@ class DataSet(object):
 
     def image_size(self, image):
         """
-        Height and width of the undistorted image.
+        Height and width of the image.
         """
         try:
-            file_path = self._undistorted_image_file(image)
-            with Image.open(file_path) as img:
+            with Image.open(self._image_file(image)) as img:
                 width, height = img.size
                 return height, width
         except:
             # Slower fallback
-            image = self.load_undistorted_image(image)
+            image = self.load_image(image)
             return image.shape[:2]
 
     def _undistorted_image_path(self):
@@ -108,6 +107,19 @@ class DataSet(object):
         """Save undistorted image pixels."""
         io.mkdir_p(self._undistorted_image_path())
         io.imwrite(self._undistorted_image_file(image), array)
+
+    def undistorted_image_size(self, image):
+        """
+        Height and width of the undistorted image.
+        """
+        try:
+            with Image.open(self._undistorted_image_file(image)) as img:
+                width, height = img.size
+                return height, width
+        except:
+            # Slower fallback
+            image = self.load_undistorted_image(image)
+            return image.shape[:2]
 
     def _load_mask_list(self):
         """Load mask list from mask_list.txt or list masks/ folder."""
