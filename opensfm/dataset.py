@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import networkx as nx
 import six
+from PIL import Image
 
 from opensfm import io
 from opensfm import config
@@ -75,6 +76,20 @@ class DataSet(object):
         The channels are in RGB order.
         """
         return io.imread(self._image_file(image))
+
+    def image_size(self, image):
+        """
+        Height and width of the undistorted image.
+        """
+        try:
+            file_path = self._undistorted_image_file(image)
+            with Image.open(file_path) as img:
+                width, height = img.size
+                return height, width
+        except:
+            # Slower fallback
+            image = self.load_undistorted_image(image)
+            return image.shape[:2]
 
     def _undistorted_image_path(self):
         return os.path.join(self.data_path, 'undistorted')
