@@ -178,8 +178,9 @@ def bundle(graph, reconstruction, gcp, config):
     if config['bundle_use_gps']:
         for shot in reconstruction.shots.values():
             g = shot.metadata.gps_position
+            gps_dop = shot.metadata.gps_dop if len(reconstruction.shots) < 5 else 5
             ba.add_position_prior(shot.id, g[0], g[1], g[2],
-                                  shot.metadata.gps_dop)
+                                   gps_dop)
 
     if config['bundle_use_gcp'] and gcp:
         _add_gcp_to_bundle(ba, gcp, reconstruction.shots)
@@ -247,8 +248,9 @@ def bundle_single_view(graph, reconstruction, shot_id, config):
 
     if config['bundle_use_gps']:
         g = shot.metadata.gps_position
+        gps_dop = shot.metadata.gps_dop if len(reconstruction.shots) < 5 else 5
         ba.add_position_prior(shot.id, g[0], g[1], g[2],
-                              shot.metadata.gps_dop)
+                              gps_dop)
 
     ba.set_point_projection_loss_function(config['loss_function'],
                                           config['loss_function_threshold'])
@@ -323,8 +325,9 @@ def bundle_local(graph, reconstruction, gcp, central_shot_id, config):
         for shot_id in interior:
             shot = reconstruction.shots[shot_id]
             g = shot.metadata.gps_position
+            gps_dop = shot.metadata.gps_dop if len(reconstruction.shots) < 5 else 5
             ba.add_position_prior(shot.id, g[0], g[1], g[2],
-                                  shot.metadata.gps_dop)
+                                  gps_dop)
 
     if config['bundle_use_gcp'] and gcp:
         _add_gcp_to_bundle(ba, gcp, reconstruction.shots)
@@ -712,6 +715,11 @@ def bootstrap_reconstruction(data, graph, im1, im2, p1, p2):
     if len(reconstruction.points) < min_inliers:
         report['decision'] = "Initial motion did not generate enough points"
         logger.info(report['decision'])
+        return None, None, report
+
+    if not im2 in graph_inliers:
+        report['decision'] = "Initial motion could not add shot"
+        logger.info(report('decision'))
         return None, None, report
 
     bundle_single_view(graph_inliers, reconstruction, im2, data.config)
